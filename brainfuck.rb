@@ -1,18 +1,18 @@
+require 'stringio'
 class Brainfuck
   class Exception < ::Exception; end
   class NegativePointerException < Exception; end
 
   attr_reader :max, :array, :code, :input, :output, :count
-  attr_accessor :arrayp, :codep, :inputp
+  attr_accessor :arrayp, :codep
 
   def initialize(max=256)
     @max      = max
     @array    = [0]
     @arrayp   = 0
+    @input    = StringIO.new
     @code     = ""
     @codep    = 0
-    @input    = []
-    @inputp   = 0
     @output   = []
     @count    = 0
   end
@@ -36,8 +36,7 @@ class Brainfuck
     when "."
       @output << @array[@arrayp]
     when ","
-      @array[@arrayp] = @input.getbyte(@inputp)
-      @inputp += 1
+      @array[@arrayp] = (@input.getc || 0).ord
     when "["
       if @array[@arrayp] == 0
         brackets = 1
@@ -76,17 +75,22 @@ class Brainfuck
     "#<#{self.class} array=#{@array.inspect} " +
     "code=#{self.class.remove_irrelevent_characters(@code).inspect} " +
     "input=#{@input.inspect} output=#{@output.inspect} pointers: { " +
-    "array=#{@arrayp} code=#{@codep} input=#{@inputp} } max=#{@max} " +
+    "array=#{@arrayp} code=#{@codep} } max=#{@max} " +
     "count=#{@count}>"
+  end
+
+  def input=(str)
+    @input = StringIO.new(str)
   end
 
   def self.remove_irrelevent_characters(str)
     str.each_char.select { |c| "><+-.,[]".include?(c) }.join
   end
 
-  def self.run(code, debug=false)
+  def self.run(code, input='', debug=false)
     bf = new
     bf.code << code
+    bf.input = input
     bf.run(debug)
   end
 
@@ -95,19 +99,20 @@ class Brainfuck
   def debug_info
     str = ""
     str += highlight(@array.map(&:to_s), @arrayp).join(" ") + "\n"
-    str += "ptrs: array=#{@arrayp} code=#{@codep} input=#{@inputp}\n"
+    str += "ptrs: array=#{@arrayp} code=#{@codep}\n"
     str += "count=#{@count}\n"
     unless @output.empty?
       str += "output: #{@output.inspect}\n"
-      str += "output: #{@output.map(&:chr).join.inspect}\n"
+      str += "output:\n#{@output.map(&:chr).join}\n" if @max == 256
     end
-    str += "input: #{@input.inspect}\n" unless @input.empty?
+    str += "code:\n"
     str += highlight(@code, @codep) + "\n"
+    str
   end
 
   def show_debug_info
     print "\e[H" + debug_info.gsub("\n", "\e[K\n") + "\e[J"
-    gets
+    sleep 0.01
   end
 
   def highlight(o, i)
@@ -122,5 +127,7 @@ class Brainfuck
 end
 
 if $0 == __FILE__
-  Brainfuck.run(ARGF.read, true)
+  code, input = ARGF.read.split('!', 2)
+  input ||= ''
+  Brainfuck.run(code, input, true)
 end
